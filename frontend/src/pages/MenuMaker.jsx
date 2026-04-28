@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, X, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Download, Sparkles } from "lucide-react";
 import api, { formatDZD, LOCALE_NAME, API } from "@/lib/api";
 import { useI18n } from "@/context/I18nContext";
 import { toast } from "sonner";
+import OcrImportModal from "@/components/OcrImportModal";
 
 function downloadCsv(path, filename) {
   const token = localStorage.getItem("rx_token");
@@ -136,6 +137,7 @@ export default function MenuMaker() {
   const [items, setItems] = useState([]);
   const [catOpen, setCatOpen] = useState(null); // object or {} for new
   const [itemOpen, setItemOpen] = useState(null);
+  const [ocrOpen, setOcrOpen] = useState(false);
   const [activeCat, setActiveCat] = useState(null);
 
   const load = async () => {
@@ -164,8 +166,11 @@ export default function MenuMaker() {
           <h1 className="font-display font-black text-3xl tracking-tight">Menu Maker</h1>
           <p className="text-rx-ink-2 mt-1">Catégories & plats · trilingue AR/FR/EN</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button className="btn-ghost inline-flex items-center gap-2" onClick={() => downloadCsv("/export/items.csv", "menu.csv")} data-testid="export-menu-csv"><Download className="w-4 h-4" /> CSV</button>
+          <button className="inline-flex items-center gap-2 bg-zinc-950 text-white rounded-lg px-4 py-2 font-semibold hover:bg-zinc-800 transition-colors" onClick={() => setOcrOpen(true)} data-testid="open-ocr">
+            <Sparkles className="w-4 h-4" /> Import par photo (IA)
+          </button>
           <button className="btn-ghost inline-flex items-center gap-2" onClick={() => setCatOpen({})} data-testid="add-category"><Plus className="w-4 h-4" /> Catégorie</button>
           <button className="btn-harissa inline-flex items-center gap-2" onClick={() => setItemOpen({})} data-testid="add-item"><Plus className="w-4 h-4" /> Article</button>
         </div>
@@ -218,6 +223,7 @@ export default function MenuMaker() {
 
       {catOpen !== null && <CategoryForm initial={catOpen.id ? catOpen : null} onClose={() => setCatOpen(null)} onSaved={load} />}
       {itemOpen !== null && <ItemForm initial={itemOpen.id ? itemOpen : null} categories={categories} onClose={() => setItemOpen(null)} onSaved={load} />}
+      {ocrOpen && <OcrImportModal onClose={() => setOcrOpen(false)} onImported={load} />}
     </div>
   );
 }

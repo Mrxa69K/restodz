@@ -15,12 +15,14 @@ import qrcode
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, UploadFile, File
 from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 import csv
+import json as jsonlib
+from openai import AsyncOpenAI
 
 
 # ---------- config ----------
@@ -30,6 +32,8 @@ JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALGORITHM = "HS256"
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "karim@restaurantos.dz")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Karim2026!")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -749,6 +753,192 @@ async def export_items(user=Depends(get_current_user)):
             int(i.get("price", 0)), "oui" if i.get("available") else "non",
         ])
     return _csv_response(rows, "menu.csv")
+
+
+# ---------- OCR Menu Import (Groq Vision) ----------
+OCR_SYSTEM_PROMPT = """You are an expert menu extraction system for Algerian restaurants.
+
+Given a photograph of a restaurant menu (printed, handwritten, or chalkboard), extract a structured JSON describing the menu.
+
+Rules:
+1. Detect the language of each item (French, Arabic, English, or mixed) and produce localized versions in ALL THREE languages.
+2. For French and English names: use natural, concise, menu-appropriate wording.
+3. For Arabic names: use proper Arabic script (not transliteration). If a dish is specifically Algerian/Maghrebi, use the authentic Arabic name (e.g., كسكس, طاجين, شربة فريك, بوراك, محاجب, مقرود, بقلاوة).
+4. Prices: extract as plain integers in DZD (Algerian Dinar). Strip currency symbols, "DA", "DZD", commas, spaces. If a range is given, take the median. If unreadable, use 0.
+5. Categories: infer reasonable categories from the menu layout ("Entrées", "Plats", "Boissons", "Desserts", "Sandwiches", "Pizzas", etc.). Each category also gets localized names in FR/AR/EN.
+6. If a short description is visible, include it, also translated to FR/AR/EN. If no description, leave empty strings.
+
+Return STRICT JSON ONLY, no prose, no code fences. Schema:
+{
+  "categories": [
+    { "name": {"fr": "Entrées", "ar": "المقبلات", "en": "Starters"} }
+  ],
+  "items": [
+    {
+      "category_name_fr": "Entrées",
+      "name": {"fr": "...", "ar": "...", "en": "..."},
+      "description": {"fr": "...", "ar": "...", "en": "..."},
+      "price": 250
+    }
+  ]
+}"""
+
+
+@api.post("/menu/ocr")
+async def menu_ocr(file: UploadFile = File(...), user=Depends(get_current_user)):
+    if not GROQ_API_KEY:
+        raise HTTPException(status_code=503, detail="OCR non configuré (GROQ_API_KEY manquante)")
+    if user["role"] not in {"owner", "manager"}:
+        raise HTTPException(status_code=403, detail="Permission refusée")
+    content = await file.read()
+    if len(content) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image trop volumineuse (max 8 Mo)")
+    mime = file.content_type or "image/jpeg"
+    if not mime.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Fichier image requis")
+    b64 = base64.b64encode(content).decode()
+    data_url = f"data:{mime};base64,{b64}"
+
+    client_groq = AsyncOpenAI(api_key=GROQ_API_KEY, base_url="https://api.groq.com/openai/v1")
+    try:
+        completion = await client_groq.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[
+                {"role": "system", "content": OCR_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Extrais le menu complet en JSON strict."},
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                },
+            ],
+            temperature=0.1,
+            max_tokens=4096,
+            response_format={"type": "json_object"},
+        )
+    except Exception as e:
+        log.exception("Groq OCR error: %s", e)
+        raise HTTPException(status_code=502, detail=f"Échec OCR: {str(e)[:200]}")
+
+    raw = completion.choices[0].message.content or "{}"
+    try:
+        parsed = jsonlib.loads(raw)
+    except Exception:
+        # try to strip code fences
+        cleaned = raw.strip().strip("`").strip()
+        if cleaned.startswith("json"):
+            cleaned = cleaned[4:].strip()
+        try:
+            parsed = jsonlib.loads(cleaned)
+        except Exception:
+            raise HTTPException(status_code=502, detail="OCR: JSON invalide renvoyé par le modèle")
+
+    categories = parsed.get("categories") or []
+    items = parsed.get("items") or []
+    # normalize
+    norm_cats = []
+    for c in categories[:30]:
+        n = c.get("name") or {}
+        norm_cats.append({"name": {
+            "fr": n.get("fr", "") or "",
+            "ar": n.get("ar", "") or "",
+            "en": n.get("en", "") or "",
+        }})
+    norm_items = []
+    for it in items[:200]:
+        n = it.get("name") or {}
+        d = it.get("description") or {}
+        try:
+            price = int(round(float(it.get("price", 0))))
+        except Exception:
+            price = 0
+        norm_items.append({
+            "category_name_fr": (it.get("category_name_fr") or "").strip(),
+            "name": {"fr": n.get("fr", "") or "", "ar": n.get("ar", "") or "", "en": n.get("en", "") or ""},
+            "description": {"fr": d.get("fr", "") or "", "ar": d.get("ar", "") or "", "en": d.get("en", "") or ""},
+            "price": price,
+        })
+
+    return {
+        "categories": norm_cats,
+        "items": norm_items,
+        "model": GROQ_MODEL,
+    }
+
+
+class OcrApplyIn(BaseModel):
+    categories: List[Dict[str, Any]]
+    items: List[Dict[str, Any]]
+
+
+@api.post("/menu/ocr/apply")
+async def menu_ocr_apply(payload: OcrApplyIn, user=Depends(get_current_user)):
+    if user["role"] not in {"owner", "manager"}:
+        raise HTTPException(status_code=403, detail="Permission refusée")
+    rid = user["restaurant_id"]
+
+    # load existing categories by fr-name to dedupe
+    existing = await db.categories.find({"restaurant_id": rid}, {"_id": 0}).to_list(500)
+    fr_to_id = {c["name"].get("fr", "").strip().lower(): c["id"] for c in existing}
+    created_cats = 0
+    next_order = max([c.get("order", 0) for c in existing], default=-1) + 1
+
+    for c in payload.categories:
+        name = c.get("name", {})
+        key = (name.get("fr", "") or "").strip().lower()
+        if not key or key in fr_to_id:
+            continue
+        cid = str(uuid.uuid4())
+        await db.categories.insert_one({
+            "id": cid,
+            "restaurant_id": rid,
+            "name": {"fr": name.get("fr", ""), "ar": name.get("ar", ""), "en": name.get("en", "")},
+            "order": next_order,
+            "created_at": now_iso(),
+        })
+        fr_to_id[key] = cid
+        created_cats += 1
+        next_order += 1
+
+    # items
+    existing_items = await db.items.find({"restaurant_id": rid}, {"_id": 0}).to_list(5000)
+    next_item_order = max([i.get("order", 0) for i in existing_items], default=-1) + 1
+    created_items = 0
+    for it in payload.items:
+        cat_key = (it.get("category_name_fr") or "").strip().lower()
+        category_id = fr_to_id.get(cat_key)
+        if not category_id:
+            # create a fallback category
+            cid = str(uuid.uuid4())
+            fallback_fr = it.get("category_name_fr") or "Divers"
+            await db.categories.insert_one({
+                "id": cid, "restaurant_id": rid,
+                "name": {"fr": fallback_fr, "ar": "", "en": fallback_fr},
+                "order": next_order, "created_at": now_iso(),
+            })
+            fr_to_id[cat_key or fallback_fr.lower()] = cid
+            next_order += 1
+            category_id = cid
+            created_cats += 1
+        name = it.get("name", {})
+        desc = it.get("description", {})
+        await db.items.insert_one({
+            "id": str(uuid.uuid4()),
+            "restaurant_id": rid,
+            "category_id": category_id,
+            "name": {"fr": name.get("fr", ""), "ar": name.get("ar", ""), "en": name.get("en", "")},
+            "description": {"fr": desc.get("fr", ""), "ar": desc.get("ar", ""), "en": desc.get("en", "")},
+            "price": float(it.get("price", 0) or 0),
+            "image_url": "",
+            "available": True,
+            "order": next_item_order,
+            "created_at": now_iso(),
+        })
+        next_item_order += 1
+        created_items += 1
+
+    return {"created_categories": created_cats, "created_items": created_items}
 
 
 # ---------- ANALYTICS ----------

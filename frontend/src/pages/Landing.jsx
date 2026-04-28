@@ -243,6 +243,20 @@ export default function Landing() {
             <Feature icon={Wifi} title="Mode faible connexion" desc="Le dashboard et le menu client sont optimisés 3G et Android low-end." />
           </div>
 
+          <div className="mt-8 card-rx p-6 bg-zinc-950 text-white border-zinc-900 flex flex-col md:flex-row items-center gap-6">
+            <div className="w-16 h-16 rounded-2xl bg-harissa flex items-center justify-center flex-shrink-0">
+              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9.937 15.5A2 2 0 008.5 14.063l-6.135-1.582a.5.5 0 010-.962L8.5 9.936A2 2 0 009.937 8.5l1.582-6.135a.5.5 0 01.963 0L14.063 8.5A2 2 0 0015.5 9.937l6.135 1.581a.5.5 0 010 .964L15.5 14.063a2 2 0 00-1.437 1.437l-1.582 6.135a.5.5 0 01-.963 0L9.937 15.5z" /></svg>
+            </div>
+            <div className="flex-1">
+              <div className="text-xs uppercase tracking-[0.18em] text-harissa font-bold">Nouveau · IA intégrée</div>
+              <h3 className="mt-2 font-display font-black text-2xl md:text-3xl">Prenez votre menu papier en photo. Importez-le en 3 secondes.</h3>
+              <p className="mt-2 text-zinc-300">
+                Notre IA lit votre menu, identifie chaque plat, son prix, sa catégorie et le traduit
+                automatiquement en arabe, français et anglais. Fini les 2 heures de saisie.
+              </p>
+            </div>
+          </div>
+
           <div className="mt-16 grid lg:grid-cols-2 gap-6">
             <div className="relative rounded-3xl overflow-hidden border border-rx min-h-[340px]">
               <img src={KITCHEN_IMG} alt="Cuisine" className="absolute inset-0 w-full h-full object-cover" />
