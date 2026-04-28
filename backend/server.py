@@ -145,6 +145,11 @@ class ItemIn(BaseModel):
     image_url: Optional[str] = ""
     available: bool = True
     order: int = 0
+    recipe: Optional[List[Dict[str, Any]]] = None  # [{stock_id, quantity}]
+
+
+class RecipeIn(BaseModel):
+    recipe: List[Dict[str, Any]]
 
 
 class TableIn(BaseModel):
@@ -377,6 +382,7 @@ async def create_item(payload: ItemIn, user=Depends(get_current_user)):
         "image_url": payload.image_url or "",
         "available": payload.available,
         "order": payload.order,
+        "recipe": payload.recipe or [],
         "created_at": now_iso(),
     }
     await db.items.insert_one(doc)
@@ -394,6 +400,8 @@ async def update_item(item_id: str, payload: ItemIn, user=Depends(get_current_us
         "available": payload.available,
         "order": payload.order,
     }
+    if payload.recipe is not None:
+        updates["recipe"] = payload.recipe
     res = await db.items.update_one(
         {"id": item_id, "restaurant_id": user["restaurant_id"]}, {"$set": updates}
     )
@@ -401,6 +409,30 @@ async def update_item(item_id: str, payload: ItemIn, user=Depends(get_current_us
         raise HTTPException(status_code=404, detail="Not found")
     row = await db.items.find_one({"id": item_id}, {"_id": 0})
     return row
+
+
+@api.put("/items/{item_id}/recipe")
+async def set_recipe(item_id: str, payload: RecipeIn, user=Depends(get_current_user)):
+    if user["role"] not in {"owner", "manager"}:
+        raise HTTPException(status_code=403, detail="Permission refusée")
+    # validate each line
+    cleaned = []
+    for line in payload.recipe:
+        sid = line.get("stock_id")
+        try:
+            qty = float(line.get("quantity", 0))
+        except Exception:
+            qty = 0
+        if not sid or qty <= 0:
+            continue
+        cleaned.append({"stock_id": sid, "quantity": qty})
+    res = await db.items.update_one(
+        {"id": item_id, "restaurant_id": user["restaurant_id"]},
+        {"$set": {"recipe": cleaned}},
+    )
+    if not res.matched_count:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"recipe": cleaned}
 
 
 @api.delete("/items/{item_id}")
