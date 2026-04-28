@@ -1,0 +1,44 @@
+{
+  "summary": "First iteration end-to-end testing of RestaurantOS SaaS. All 21 backend pytest tests pass (100%). All frontend flows render correctly for the seeded owner account. No critical blockers found. Only minor recharts width warning on dashboard load and a non-blocking CORS/cookie flag that may bite later.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/login + /api/auth/register", "issue": "Server sets httpOnly access_token cookie AND returns bearer token. get_current_user prefers cookie over Authorization header. If a frontend/browser session first registers (gets cookie) and later logs in as different user without clearing cookie, requests using Bearer of new user may silently resolve to old cookie-based user. Low risk in current frontend but worth noting."},
+      {"endpoint": "CORS middleware", "issue": "allow_origins=['*'] with allow_credentials=False. Cookies therefore cannot be used cross-origin from browser fetches in production; frontend relies on Authorization header (works fine via /app/frontend/src/lib/api.js). Acceptable for current Bearer-based flow."},
+      {"endpoint": "/api/orders count_today", "issue": "count_documents uses created_at >= 'YYYY-MM-DD' string compared to ISO datetime strings. Works because ISO dates sort lexicographically, but mixing string-prefix compare with ISO is fragile. Cosmetic."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard", "issues": ["Recharts warns 'width(-1) and height(-1) of chart should be greater than 0' on first paint (ResponsiveContainer in hidden/0-sized parent). Charts still render correctly after layout settles, but consider setting explicit min-height on the chart card to remove the console warning."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Add explicit min-height to dashboard/analytics chart containers to silence recharts width=-1 warnings",
+    "(Optional, hardening) In get_current_user, if Authorization header is present, prefer it over cookie — avoids stale cookie shadowing bearer token when multiple users share a browser session"
+  ],
+  "critical_code_review_comments": [
+    "server.py is ~930 lines; still manageable but close to the 700-line split threshold — consider splitting into routers/auth.py, routers/menu.py, routers/orders.py, routers/analytics.py for maintainability.",
+    "set_auth_cookie uses secure=False — fine for local dev but must be True in production (behind HTTPS).",
+    "allow_credentials=False with allow_origins='*' is the only safe combo right now; if cookie auth is later needed from browser, replace '*' with explicit FRONTEND_URL and flip credentials to True.",
+    "seed_demo is idempotent only on the admin user existence check — if admin exists but child collections were cleared, seed won't re-populate. Consider seeding each collection independently if empty.",
+    "_create_order recomputes totals server-side using price_map (good). However if an item_id is invalid, price_map.get returns 0 silently and the line is still added with price 0 — should reject order with 400 on unknown items.",
+    "Public POST /api/public/restaurant/{slug}/order has no rate limiting or captcha — potential abuse vector in production."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (21/21)", "frontend": "100% of listed flows verified"},
+  "test_credentials": "karim@restaurantos.dz / Karim2026! (seeded owner of Chez Karim, slug=chez-karim)",
+  "seed_data_creation": "No new seed data created by test. Several TEST_ prefixed tenants created via /api/auth/register for isolation test — harmless, isolated in their own restaurant_id scope.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression suite is at /app/backend/tests/backend_test.py (21 tests, all green). Covers auth, categories, items, tables+QR, stock, orders lifecycle (pending→preparing→ready→served), analytics dashboard + trends, public menu, public order, and multi-tenant isolation. IMPORTANT: the seeded owner karim@restaurantos.dz cannot use shared requests.Session across tests because /auth/register and /auth/login both set an httpOnly cookie and the backend get_current_user prefers cookie over Authorization — use requests.Session per test or pop cookies. Frontend uses Bearer token in localStorage 'rx_token' via /app/frontend/src/lib/api.js so no browser-side cookie issues.",
+  "rca of the issue": "N/A — no bugs blocking functionality were found. The only notable architectural quirk is the cookie-vs-bearer precedence in get_current_user; documented above as a minor hardening item."
+}
