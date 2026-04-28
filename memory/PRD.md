@@ -70,3 +70,13 @@ Full SaaS for Algerian restaurants: Menu Maker (trilingual AR/FR/EN), QR per tab
 - [x] 3 new seeded test accounts: manager, kitchen, waiter
 - [x] Role-based sidebar (hides routes per role) + RoleHome (role-based default landing)
 - [x] Backend tests: 50/50 passing
+
+## Iteration 3 (2026-04-28) — OCR Menu Import
+- [x] `POST /api/menu/ocr` — uploads menu photo → Groq Vision (`meta-llama/llama-4-scout-17b-16e-instruct`) → returns structured `{categories, items}` with auto-translation AR/FR/EN, prices in DZD
+- [x] `POST /api/menu/ocr/apply` — writes selected items into tenant's menu (dedupes categories by fr-name, creates fallback categories for unmatched items)
+- [x] Frontend: `Import par photo (IA)` button in Menu Maker → upload + preview → analyze (~3-6s) → editable table of extracted items → multi-select + apply
+- [x] Landing page: new "IA intégrée" feature callout
+- [x] Uses user-supplied Groq API key stored in `/app/backend/.env` (GROQ_API_KEY, GROQ_MODEL)
+- [x] `DEPLOYMENT_NOTES.md` created with key-rotation reminders
+- [x] RBAC: only owner + manager can use OCR endpoints
+- [x] Backend tests: 59/59 passing (9 new OCR tests + 50 regression)
