@@ -1,8 +1,21 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
-import api, { formatDZD, LOCALE_NAME } from "@/lib/api";
+import { Plus, Pencil, Trash2, X, Download } from "lucide-react";
+import api, { formatDZD, LOCALE_NAME, API } from "@/lib/api";
 import { useI18n } from "@/context/I18nContext";
 import { toast } from "sonner";
+
+function downloadCsv(path, filename) {
+  const token = localStorage.getItem("rx_token");
+  fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${token}` } })
+    .then((r) => r.blob())
+    .then((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+}
 
 function CategoryForm({ initial, onClose, onSaved }) {
   const [name, setName] = useState(initial?.name || { fr: "", ar: "", en: "" });
@@ -152,6 +165,7 @@ export default function MenuMaker() {
           <p className="text-rx-ink-2 mt-1">Catégories & plats · trilingue AR/FR/EN</p>
         </div>
         <div className="flex gap-2">
+          <button className="btn-ghost inline-flex items-center gap-2" onClick={() => downloadCsv("/export/items.csv", "menu.csv")} data-testid="export-menu-csv"><Download className="w-4 h-4" /> CSV</button>
           <button className="btn-ghost inline-flex items-center gap-2" onClick={() => setCatOpen({})} data-testid="add-category"><Plus className="w-4 h-4" /> Catégorie</button>
           <button className="btn-harissa inline-flex items-center gap-2" onClick={() => setItemOpen({})} data-testid="add-item"><Plus className="w-4 h-4" /> Article</button>
         </div>

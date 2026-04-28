@@ -12,6 +12,8 @@ const DICT = {
     tables: "Tables & QR",
     analytics: "Analytiques",
     stock: "Stock",
+    feedback: "Avis clients",
+    staff: "Équipe",
     settings: "Paramètres",
     logout: "Déconnexion",
     // landing
@@ -67,6 +69,8 @@ const DICT = {
     tables: "الطاولات و QR",
     analytics: "التحليلات",
     stock: "المخزون",
+    feedback: "آراء الزبائن",
+    staff: "الفريق",
     settings: "الإعدادات",
     logout: "تسجيل الخروج",
     get_started: "ابدأ الآن",

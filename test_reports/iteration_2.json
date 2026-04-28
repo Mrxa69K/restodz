@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 2 end-to-end testing complete. Backend: 50/50 pytest tests pass (21 regression from iteration 1 + 29 new for /api/staff RBAC, /api/export/*.csv, public feedback, kitchen-role order access). Frontend: all 4 role logins work, role-based sidebar + landing routes verified (owner/manager→dashboard, kitchen→kitchen, waiter→orders), RoleGuard correctly redirects kitchen away from /app/staff, StaffPage and FeedbackPage render seeded data, CSV download triggers actual file (commandes.csv), customer feedback flow (order→modal→star rating→submit) works end-to-end, offline indicator banner appears on offline event. No new blocking issues. Only carry-over recharts width=-1 console warning from iteration 1.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/public/restaurant/{slug}/feedback", "issue": "No rate limiting / captcha on public POST — same abuse risk as public order endpoint flagged in iteration 1. Acceptable for MVP."},
+      {"endpoint": "/api/staff PATCH", "issue": "Role validation message says 'Seul le propriétaire peut créer un manager' even on update — copy is slightly misleading (says 'créer' for an update path). Cosmetic."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard / Analytics", "issues": ["Recharts still warns 'width(-1) and height(-1) of chart should be greater than 0' on first paint. Carried over from iteration 1, non-blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration2.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iteration2_results.xml"
+  ],
+  "action_items": [
+    "(Optional, low-pri) Add explicit min-height/aspect to dashboard chart containers to silence recharts width=-1 warning",
+    "(Optional, copy) /api/staff PATCH error 'Seul le propriétaire peut créer un manager' should say 'attribuer' instead of 'créer' on update path",
+    "(Optional, hardening) Add rate-limit on /api/public/restaurant/{slug}/feedback (and /order) to prevent spam"
+  ],
+  "critical_code_review_comments": [
+    "server.py is now ~1150 lines — past the 700-line split threshold. Recommend splitting into routers/auth.py, routers/staff.py, routers/menu.py, routers/orders.py, routers/exports.py, routers/feedback.py for maintainability.",
+    "require_role() in server.py uses string membership; consider a proper Enum + dependency factory like Depends(role_required('owner','manager')) for cleaner FastAPI integration and OpenAPI docs.",
+    "_csv_response loads entire result set into memory via to_list(10000)/(5000). Fine for MVP; for >10k rows consider true streaming with async generator.",
+    "Public feedback endpoint trusts client-supplied order_id — if provided, server should verify order_id belongs to the same restaurant; today an attacker could attach feedback to any order id without validation.",
+    "StaffPage lists ALL users including the current owner; the 'cannot delete owner' / 'cannot delete self' rules are enforced server-side (good) but the UI still shows the trash icon next to those rows — consider hiding/disabling client-side too for clarity."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration2.py"
+  ],
+  "success_rate": {"backend": "100% (50/50 across both files)", "frontend": "100% of listed flows verified"},
+  "test_credentials": "owner karim@restaurantos.dz/Karim2026!, manager manager@restaurantos.dz/Manager2026!, kitchen kitchen@restaurantos.dz/Kitchen2026!, waiter waiter@restaurantos.dz/Waiter2026! — all seeded in 'Chez Karim' (slug=chez-karim).",
+  "seed_data_creation": "A few TEST_-prefixed staff users + TEST_-prefixed feedback entries created during testing. Staff entries are cleaned up by their own tests; feedback entries persist (visible on /app/feedback). Idempotent — won't conflict with reseeding.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression suite is at /app/backend/tests/ (test_iteration2.py + backend_test.py = 50 tests, all green). Iteration 2 features: (a) /api/staff GET/POST/PATCH/DELETE with RBAC — owner+manager can list/manage, kitchen+waiter get 403. Manager cannot create another manager (403). Cannot modify/delete owner. Cannot self-delete. (b) /api/export/orders.csv|stock.csv|items.csv return text/csv with attachment Content-Disposition. (c) /api/public/restaurant/{slug}/feedback creates feedback w/o auth, rating clamped 1-5. (d) Kitchen role can still GET /api/orders and PATCH /api/orders/{id}/status. Frontend testids of note: login-email, login-password, login-submit, app-sidebar, nav-{kitchen|orders|dashboard|menu|tables|analytics|stock|feedback|staff|settings}, staff-page, staff-row-{id}, add-staff, staff-name|email|password|role-{owner|manager|kitchen|waiter}|save, feedback-page, feedback-row-{id}, export-orders-csv, export-stock-csv, export-menu-csv, open-cart, submit-order, fb-star-1..5, fb-comment, offline-indicator. RoleHome at / inside /app redirects: owner/manager→dashboard, kitchen→kitchen, waiter→orders. RoleGuard wraps protected pages and redirects to RoleHome on permission denial.",
+  "rca of the issue": "N/A — no bugs blocking functionality were found in iteration 2. All RBAC paths, CSV exports, role-based navigation, feedback creation/listing, and kitchen role order access are working end-to-end."
+}

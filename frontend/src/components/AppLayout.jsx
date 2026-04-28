@@ -1,20 +1,23 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ChefHat, ReceiptText, BookOpen, QrCode,
-  LineChart, Boxes, Settings, LogOut, Globe, Store,
+  LineChart, Boxes, Settings, LogOut, Globe, Store, Users, MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/context/I18nContext";
+import OfflineIndicator from "@/components/OfflineIndicator";
 
 const nav = [
-  { to: "/app/dashboard", i: LayoutDashboard, k: "dashboard" },
-  { to: "/app/kitchen", i: ChefHat, k: "kitchen" },
-  { to: "/app/orders", i: ReceiptText, k: "orders" },
-  { to: "/app/menu", i: BookOpen, k: "menu" },
-  { to: "/app/tables", i: QrCode, k: "tables" },
-  { to: "/app/analytics", i: LineChart, k: "analytics" },
-  { to: "/app/stock", i: Boxes, k: "stock" },
-  { to: "/app/settings", i: Settings, k: "settings" },
+  { to: "/app/dashboard", i: LayoutDashboard, k: "dashboard", roles: ["owner", "manager"] },
+  { to: "/app/kitchen", i: ChefHat, k: "kitchen", roles: ["owner", "manager", "kitchen", "waiter"] },
+  { to: "/app/orders", i: ReceiptText, k: "orders", roles: ["owner", "manager", "kitchen", "waiter"] },
+  { to: "/app/menu", i: BookOpen, k: "menu", roles: ["owner", "manager"] },
+  { to: "/app/tables", i: QrCode, k: "tables", roles: ["owner", "manager", "waiter"] },
+  { to: "/app/analytics", i: LineChart, k: "analytics", roles: ["owner", "manager"] },
+  { to: "/app/stock", i: Boxes, k: "stock", roles: ["owner", "manager"] },
+  { to: "/app/feedback", i: MessageSquare, k: "feedback", roles: ["owner", "manager"] },
+  { to: "/app/staff", i: Users, k: "staff", roles: ["owner", "manager"] },
+  { to: "/app/settings", i: Settings, k: "settings", roles: ["owner", "manager"] },
 ];
 
 export default function AppLayout() {
@@ -26,6 +29,10 @@ export default function AppLayout() {
     await logout();
     navigate("/login");
   };
+
+  const role = user?.role || "owner";
+  const visibleNav = nav.filter((n) => n.roles.includes(role));
+  const roleLabel = { owner: "Propriétaire", manager: "Manager", kitchen: "Cuisine", waiter: "Serveur" }[role] || role;
 
   return (
     <div className="min-h-screen bg-rx-paper" data-testid="app-layout">
@@ -43,11 +50,14 @@ export default function AppLayout() {
         <div className="px-4 py-4 border-b border-rx">
           <div className="text-xs uppercase tracking-widest text-rx-ink-3 font-semibold">{t("settings")}</div>
           <div className="mt-2 font-semibold text-rx-ink truncate">{restaurant?.name}</div>
-          <div className="text-xs text-rx-ink-2 mt-1">Plan Pro</div>
+          <div className="text-xs text-rx-ink-2 mt-1 flex items-center gap-2">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-harissa" />
+            {roleLabel}
+          </div>
         </div>
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto scroll-soft">
-          {nav.map((n) => (
+          {visibleNav.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
@@ -93,6 +103,7 @@ export default function AppLayout() {
       </header>
 
       <main className="lg:ms-64 min-h-screen" data-testid="app-main">
+        <OfflineIndicator />
         <Outlet />
       </main>
     </div>

@@ -16,9 +16,11 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
+from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
+import csv
 
 
 # ---------- config ----------
@@ -177,6 +179,34 @@ class FeedbackIn(BaseModel):
     rating: int
     comment: str = ""
     customer_name: str = ""
+    order_id: Optional[str] = None
+
+
+class StaffIn(BaseModel):
+    email: EmailStr
+    name: str
+    password: str = Field(min_length=6)
+    role: str  # manager | kitchen | waiter
+
+
+class StaffUpdate(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    password: Optional[str] = None
+
+
+ROLES = {"owner", "manager", "kitchen", "waiter"}
+ROLE_PERMS = {
+    "owner": {"all"},
+    "manager": {"dashboard", "orders", "kitchen", "menu", "tables", "analytics", "stock", "feedback", "settings", "export"},
+    "kitchen": {"kitchen", "orders"},
+    "waiter": {"orders", "tables", "kitchen"},
+}
+
+
+def require_role(user: Dict[str, Any], *roles: str):
+    if user.get("role") not in roles:
+        raise HTTPException(status_code=403, detail="Permission refusée")
 
 
 # ---------- utilities ----------
@@ -577,6 +607,150 @@ async def list_feedback(user=Depends(get_current_user)):
     return rows
 
 
+# ---------- STAFF (owner + manager) ----------
+@api.get("/staff")
+async def list_staff(user=Depends(get_current_user)):
+    require_role(user, "owner", "manager")
+    rows = await db.users.find(
+        {"restaurant_id": user["restaurant_id"]},
+        {"_id": 0, "password_hash": 0},
+    ).sort("created_at", 1).to_list(200)
+    return rows
+
+
+@api.post("/staff")
+async def create_staff(payload: StaffIn, user=Depends(get_current_user)):
+    require_role(user, "owner", "manager")
+    if payload.role not in {"manager", "kitchen", "waiter"}:
+        raise HTTPException(status_code=400, detail="Rôle invalide")
+    # only owner can create managers
+    if payload.role == "manager" and user["role"] != "owner":
+        raise HTTPException(status_code=403, detail="Seul le propriétaire peut créer un manager")
+    email = payload.email.lower()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="Email déjà utilisé")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "name": payload.name,
+        "password_hash": hash_password(payload.password),
+        "restaurant_id": user["restaurant_id"],
+        "role": payload.role,
+        "created_at": now_iso(),
+    }
+    await db.users.insert_one(doc)
+    doc.pop("password_hash", None)
+    return strip_mongo(doc)
+
+
+@api.patch("/staff/{staff_id}")
+async def update_staff(staff_id: str, payload: StaffUpdate, user=Depends(get_current_user)):
+    require_role(user, "owner", "manager")
+    target = await db.users.find_one(
+        {"id": staff_id, "restaurant_id": user["restaurant_id"]}
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Introuvable")
+    if target["role"] == "owner":
+        raise HTTPException(status_code=403, detail="Impossible de modifier le propriétaire")
+    updates: Dict[str, Any] = {}
+    if payload.name:
+        updates["name"] = payload.name
+    if payload.role:
+        if payload.role not in {"manager", "kitchen", "waiter"}:
+            raise HTTPException(status_code=400, detail="Rôle invalide")
+        if payload.role == "manager" and user["role"] != "owner":
+            raise HTTPException(status_code=403, detail="Seul le propriétaire peut créer un manager")
+        updates["role"] = payload.role
+    if payload.password:
+        updates["password_hash"] = hash_password(payload.password)
+    if updates:
+        await db.users.update_one({"id": staff_id}, {"$set": updates})
+    row = await db.users.find_one(
+        {"id": staff_id}, {"_id": 0, "password_hash": 0}
+    )
+    return row
+
+
+@api.delete("/staff/{staff_id}")
+async def delete_staff(staff_id: str, user=Depends(get_current_user)):
+    require_role(user, "owner", "manager")
+    target = await db.users.find_one(
+        {"id": staff_id, "restaurant_id": user["restaurant_id"]}
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Introuvable")
+    if target["role"] == "owner":
+        raise HTTPException(status_code=403, detail="Impossible de supprimer le propriétaire")
+    if target["id"] == user["id"]:
+        raise HTTPException(status_code=400, detail="Vous ne pouvez pas vous supprimer")
+    await db.users.delete_one({"id": staff_id})
+    return {"ok": True}
+
+
+# ---------- EXPORT CSV ----------
+def _csv_response(rows: List[List[Any]], filename: str) -> StreamingResponse:
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    for r in rows:
+        w.writerow(r)
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@api.get("/export/orders.csv")
+async def export_orders(user=Depends(get_current_user)):
+    rid = user["restaurant_id"]
+    orders = await db.orders.find({"restaurant_id": rid}, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    items = await db.items.find({"restaurant_id": rid}, {"_id": 0}).to_list(5000)
+    items_map = {i["id"]: i for i in items}
+    tables = await db.tables.find({"restaurant_id": rid}, {"_id": 0}).to_list(500)
+    tmap = {t["id"]: t["label"] for t in tables}
+    rows = [["numero", "date", "heure", "type", "table", "articles", "total_DZD", "statut"]]
+    for o in orders:
+        dt = o.get("created_at", "")
+        date, _, time = dt.partition("T")
+        arts = ", ".join(
+            f"{li['quantity']}x {items_map.get(li['item_id'], {}).get('name', {}).get('fr', '?')}"
+            for li in o.get("items", [])
+        )
+        rows.append([
+            o.get("number", ""), date, time[:5],
+            o.get("type", ""), tmap.get(o.get("table_id"), ""),
+            arts, int(o.get("total", 0)), o.get("status", ""),
+        ])
+    return _csv_response(rows, "commandes.csv")
+
+
+@api.get("/export/stock.csv")
+async def export_stock(user=Depends(get_current_user)):
+    rows = [["ingredient", "unite", "quantite", "seuil_bas", "cout_unitaire_DZD", "valeur_DZD"]]
+    stock = await db.stock.find({"restaurant_id": user["restaurant_id"]}, {"_id": 0}).to_list(1000)
+    for s in stock:
+        rows.append([s["name"], s["unit"], s["quantity"], s["low_threshold"], s["cost"], s["cost"] * s["quantity"]])
+    return _csv_response(rows, "stock.csv")
+
+
+@api.get("/export/items.csv")
+async def export_items(user=Depends(get_current_user)):
+    rid = user["restaurant_id"]
+    cats = await db.categories.find({"restaurant_id": rid}, {"_id": 0}).to_list(500)
+    cmap = {c["id"]: c["name"].get("fr", "") for c in cats}
+    rows = [["categorie", "nom_fr", "nom_ar", "nom_en", "prix_DZD", "disponible"]]
+    items = await db.items.find({"restaurant_id": rid}, {"_id": 0}).to_list(5000)
+    for i in items:
+        rows.append([
+            cmap.get(i.get("category_id"), ""),
+            i["name"].get("fr", ""), i["name"].get("ar", ""), i["name"].get("en", ""),
+            int(i.get("price", 0)), "oui" if i.get("available") else "non",
+        ])
+    return _csv_response(rows, "menu.csv")
+
+
 # ---------- ANALYTICS ----------
 @api.get("/analytics/dashboard")
 async def analytics_dashboard(user=Depends(get_current_user)):
@@ -744,9 +918,10 @@ async def public_feedback(slug: str, payload: FeedbackIn):
     doc = {
         "id": str(uuid.uuid4()),
         "restaurant_id": r["id"],
-        "rating": payload.rating,
+        "rating": max(1, min(5, payload.rating)),
         "comment": payload.comment,
         "customer_name": payload.customer_name,
+        "order_id": payload.order_id,
         "created_at": now_iso(),
     }
     await db.feedback.insert_one(doc)
@@ -904,6 +1079,52 @@ async def seed_demo():
                     "updated_at": dt.isoformat(),
                 })
         log.info("Seed complete")
+
+    # Always ensure staff test accounts exist (idempotent)
+    restaurant_doc = await db.restaurants.find_one({"slug": "chez-karim"}, {"_id": 0})
+    if restaurant_doc:
+        staff_seeds = [
+            ("manager@restaurantos.dz", "Manager2026!", "Amina Hadj", "manager"),
+            ("kitchen@restaurantos.dz", "Kitchen2026!", "Yacine Chef", "kitchen"),
+            ("waiter@restaurantos.dz", "Waiter2026!", "Samir Serveur", "waiter"),
+        ]
+        for email, pw, name, role in staff_seeds:
+            existing = await db.users.find_one({"email": email})
+            if not existing:
+                await db.users.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "email": email,
+                    "name": name,
+                    "password_hash": hash_password(pw),
+                    "restaurant_id": restaurant_doc["id"],
+                    "role": role,
+                    "created_at": now_iso(),
+                })
+
+        # sample feedback if none
+        if await db.feedback.count_documents({"restaurant_id": restaurant_doc["id"]}) == 0:
+            import random as _rd
+            _rd.seed(9)
+            sample_fb = [
+                (5, "Couscous excellent comme chez ma grand-mère. Je reviendrai !", "Leila"),
+                (4, "Service rapide, bonne ambiance. Le thé à la menthe est parfait.", "Mehdi"),
+                (5, "Meilleur Mhadjeb d'Alger. Bravo à l'équipe.", "Nadir"),
+                (3, "Plat bon mais un peu long à arriver.", "Sarah"),
+                (5, "شربة فريك لذيذة جداً", "Fatima"),
+                (4, "Baklawa maison excellente. Un peu bruyant le vendredi soir.", "Karim M."),
+            ]
+            for r, c, n in sample_fb:
+                days_ago = _rd.randint(0, 6)
+                dt = datetime.now(timezone.utc) - timedelta(days=days_ago, hours=_rd.randint(0, 23))
+                await db.feedback.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "restaurant_id": restaurant_doc["id"],
+                    "rating": r,
+                    "comment": c,
+                    "customer_name": n,
+                    "order_id": None,
+                    "created_at": dt.isoformat(),
+                })
 
 
 @app.on_event("startup")

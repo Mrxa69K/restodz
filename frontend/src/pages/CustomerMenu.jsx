@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { Plus, Minus, ShoppingCart, X, Store, Check } from "lucide-react";
+import { Plus, Minus, ShoppingCart, X, Store, Check, Star } from "lucide-react";
 import api, { formatDZD, LOCALE_NAME } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -14,6 +14,11 @@ export default function CustomerMenu() {
   const [activeCat, setActiveCat] = useState(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [placed, setPlaced] = useState(null);
+  const [fbOpen, setFbOpen] = useState(false);
+  const [fbRating, setFbRating] = useState(0);
+  const [fbComment, setFbComment] = useState("");
+  const [fbName, setFbName] = useState("");
+  const [fbSent, setFbSent] = useState(false);
 
   useEffect(() => {
     api.get(`/public/restaurant/${slug}`).then(({ data }) => {
@@ -68,10 +73,29 @@ export default function CustomerMenu() {
   if (data.__notfound) return <div className="min-h-screen flex items-center justify-center text-rx-ink-2">Restaurant introuvable</div>;
 
   const L = {
-    fr: { menu: "Menu", cart: "Mon panier", submit: "Envoyer la commande", empty: "Votre panier est vide", qty: "Quantité", takeaway: "À emporter", table: "Table", placed: "Commande envoyée !", placed_desc: "Votre commande a été envoyée en cuisine." },
-    ar: { menu: "القائمة", cart: "سلتي", submit: "إرسال الطلب", empty: "السلة فارغة", qty: "الكمية", takeaway: "للأخذ", table: "طاولة", placed: "تم إرسال الطلب!", placed_desc: "تم إرسال طلبك إلى المطبخ." },
-    en: { menu: "Menu", cart: "My cart", submit: "Place order", empty: "Your cart is empty", qty: "Quantity", takeaway: "Takeaway", table: "Table", placed: "Order placed!", placed_desc: "Your order has been sent to the kitchen." },
+    fr: { menu: "Menu", cart: "Mon panier", submit: "Envoyer la commande", empty: "Votre panier est vide", qty: "Quantité", takeaway: "À emporter", table: "Table", placed: "Commande envoyée !", placed_desc: "Votre commande a été envoyée en cuisine.", leave_fb: "Laisser un avis", rate: "Notez votre expérience", fb_name: "Votre prénom (facultatif)", fb_comment: "Commentaire (facultatif)", send: "Envoyer", fb_thanks: "Merci pour votre avis !", new_order: "Nouvelle commande" },
+    ar: { menu: "القائمة", cart: "سلتي", submit: "إرسال الطلب", empty: "السلة فارغة", qty: "الكمية", takeaway: "للأخذ", table: "طاولة", placed: "تم إرسال الطلب!", placed_desc: "تم إرسال طلبك إلى المطبخ.", leave_fb: "أضف تقييمك", rate: "قيم تجربتك", fb_name: "اسمك (اختياري)", fb_comment: "تعليق (اختياري)", send: "إرسال", fb_thanks: "شكراً على تقييمك!", new_order: "طلب جديد" },
+    en: { menu: "Menu", cart: "My cart", submit: "Place order", empty: "Your cart is empty", qty: "Quantity", takeaway: "Takeaway", table: "Table", placed: "Order placed!", placed_desc: "Your order has been sent to the kitchen.", leave_fb: "Leave feedback", rate: "Rate your experience", fb_name: "Your name (optional)", fb_comment: "Comment (optional)", send: "Send", fb_thanks: "Thanks for your feedback!", new_order: "New order" },
   }[lang];
+
+  const sendFeedback = async () => {
+    if (fbRating < 1) return;
+    try {
+      await api.post(`/public/restaurant/${slug}/feedback`, {
+        rating: fbRating,
+        comment: fbComment,
+        customer_name: fbName,
+        order_id: placed?.id || null,
+      });
+      setFbSent(true);
+      setTimeout(() => {
+        setFbOpen(false);
+        setPlaced(null);
+        setFbSent(false);
+        setFbRating(0); setFbComment(""); setFbName("");
+      }, 1500);
+    } catch (e) { toast.error("Erreur"); }
+  };
 
   const tableLabel = data.tables.find((x) => x.id === tableId)?.label;
 
@@ -205,7 +229,7 @@ export default function CustomerMenu() {
       )}
 
       {/* placed modal */}
-      {placed && (
+      {placed && !fbOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-sm w-full p-8 text-center" data-testid="order-placed">
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
@@ -216,7 +240,56 @@ export default function CustomerMenu() {
             <div className="mt-4 text-sm">
               Numéro : <span className="font-bold">{placed.number}</span>
             </div>
-            <button onClick={() => setPlaced(null)} className="btn-ghost w-full mt-6">Nouvelle commande</button>
+            <button onClick={() => setFbOpen(true)} className="btn-harissa w-full mt-6 inline-flex items-center justify-center gap-2" data-testid="leave-feedback">
+              <Star className="w-4 h-4" /> {L.leave_fb}
+            </button>
+            <button onClick={() => setPlaced(null)} className="btn-ghost w-full mt-2">{L.new_order}</button>
+          </div>
+        </div>
+      )}
+
+      {/* feedback modal */}
+      {fbOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-8" data-testid="feedback-modal">
+            {fbSent ? (
+              <div className="text-center py-6">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+                  <Check className="w-8 h-8" />
+                </div>
+                <div className="mt-4 font-display font-black text-xl">{L.fb_thanks}</div>
+              </div>
+            ) : (
+              <>
+                <div className="font-display font-black text-xl text-center">{L.rate}</div>
+                <div className="flex justify-center gap-1 mt-4">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button key={n} onClick={() => setFbRating(n)} data-testid={`fb-star-${n}`}>
+                      <Star className={`w-9 h-9 ${n <= fbRating ? "fill-amber-400 text-amber-400" : "text-zinc-300"}`} />
+                    </button>
+                  ))}
+                </div>
+                <input
+                  className="mt-5 w-full px-3 py-2.5 rounded-lg border border-rx"
+                  placeholder={L.fb_name}
+                  value={fbName}
+                  onChange={(e) => setFbName(e.target.value)}
+                  data-testid="fb-name"
+                />
+                <textarea
+                  rows={3}
+                  className="mt-3 w-full px-3 py-2.5 rounded-lg border border-rx"
+                  placeholder={L.fb_comment}
+                  value={fbComment}
+                  onChange={(e) => setFbComment(e.target.value)}
+                  data-testid="fb-comment"
+                />
+                <button disabled={fbRating < 1} onClick={sendFeedback} className="btn-harissa w-full mt-4 disabled:opacity-50" data-testid="fb-send">
+                  {L.send}
+                </button>
+                <button onClick={() => { setFbOpen(false); setPlaced(null); }} className="btn-ghost w-full mt-2">{L.new_order}</button>
+              </>
+            )}
           </div>
         </div>
       )}

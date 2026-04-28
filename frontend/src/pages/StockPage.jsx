@@ -1,7 +1,20 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2, AlertTriangle } from "lucide-react";
-import api, { formatDZD } from "@/lib/api";
+import { Plus, Trash2, AlertTriangle, Download } from "lucide-react";
+import api, { formatDZD, API } from "@/lib/api";
 import { toast } from "sonner";
+
+function downloadCsv(path, filename) {
+  const token = localStorage.getItem("rx_token");
+  fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${token}` } })
+    .then((r) => r.blob())
+    .then((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+}
 
 export default function StockPage() {
   const [items, setItems] = useState([]);
@@ -21,8 +34,15 @@ export default function StockPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-[1400px] mx-auto" data-testid="stock-page">
-      <h1 className="font-display font-black text-3xl tracking-tight mb-1">Stock & Achats</h1>
-      <p className="text-rx-ink-2 mb-6">Ingrédients, seuils et coûts.</p>
+      <div className="flex items-start justify-between mb-5 gap-4">
+        <div>
+          <h1 className="font-display font-black text-3xl tracking-tight">Stock & Achats</h1>
+          <p className="text-rx-ink-2">Ingrédients, seuils et coûts.</p>
+        </div>
+        <button onClick={() => downloadCsv("/export/stock.csv", "stock.csv")} className="btn-ghost inline-flex items-center gap-2" data-testid="export-stock-csv">
+          <Download className="w-4 h-4" /> CSV
+        </button>
+      </div>
 
       <div className="card-rx p-4 mb-4">
         <div className="grid grid-cols-2 md:grid-cols-6 gap-2">

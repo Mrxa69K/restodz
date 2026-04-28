@@ -9,3 +9,10 @@ root.render(
     <App />
   </React.StrictMode>,
 );
+
+// service worker for offline support (disabled in dev to avoid HMR conflicts)
+if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}

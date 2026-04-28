@@ -1,7 +1,21 @@
 import { useEffect, useState } from "react";
-import api, { formatDZD, LOCALE_NAME } from "@/lib/api";
+import api, { formatDZD, LOCALE_NAME, API } from "@/lib/api";
 import { useI18n } from "@/context/I18nContext";
 import { StatusBadge } from "./Dashboard";
+import { Download } from "lucide-react";
+
+function downloadCsv(path, filename) {
+  const token = localStorage.getItem("rx_token");
+  fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${token}` } })
+    .then((r) => r.blob())
+    .then((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+}
 
 export default function OrdersPage() {
   const { t, lang } = useI18n();
@@ -18,8 +32,15 @@ export default function OrdersPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-[1400px] mx-auto" data-testid="orders-page">
-      <h1 className="font-display font-black text-3xl tracking-tight mb-1">{t("orders")}</h1>
-      <p className="text-rx-ink-2 mb-5">Historique complet des commandes.</p>
+      <div className="flex items-start justify-between mb-5 gap-4">
+        <div>
+          <h1 className="font-display font-black text-3xl tracking-tight">{t("orders")}</h1>
+          <p className="text-rx-ink-2">Historique complet des commandes.</p>
+        </div>
+        <button onClick={() => downloadCsv("/export/orders.csv", "commandes.csv")} className="btn-ghost inline-flex items-center gap-2" data-testid="export-orders-csv">
+          <Download className="w-4 h-4" /> CSV
+        </button>
+      </div>
 
       <div className="flex gap-2 mb-4 flex-wrap">
         {[["", "Toutes"], ["pending", t("pending")], ["preparing", t("preparing")], ["ready", t("ready")], ["served", t("served")], ["cancelled", "Annulées"]].map(([k, label]) => (
