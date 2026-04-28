@@ -1,0 +1,145 @@
+{
+  "theme": "light",
+  "archetype": "4 - Swiss & High-Contrast (Adapted for Food Tech)",
+  "rationale": "For an Algerian B2B SaaS in the restaurant space (cash-first), the UI must project extreme clarity, speed, and trust. A stark Swiss-inspired base ensures the data (KPIs, Kitchen Orders) is instantly legible in high-pressure environments. The accent color is a warm 'Harissa Orange' (replacing cold tech colors) to match the food context and align with the user's provided PDF reference.",
+  "fonts": {
+    "headings": "Outfit",
+    "body": "Tajawal",
+    "google_fonts_url": "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Tajawal:wght@400;500;700;800;900&display=swap",
+    "implementation_notes": "Use Outfit for all UI headings, numeric KPI displays, and marketing headers. Use Tajawal for all body text, UI labels, and specifically any section containing Arabic text to ensure perfect RTL typography."
+  },
+  "colors": {
+    "background": {
+      "default": "#FFFFFF",
+      "muted": "#F4F4F5",
+      "paper": "#FAFAFA"
+    },
+    "text": {
+      "primary": "#09090B",
+      "secondary": "#52525B",
+      "tertiary": "#A1A1AA",
+      "inverse": "#FFFFFF"
+    },
+    "brand": {
+      "primary": "#F97316",
+      "primary_hover": "#EA580C",
+      "primary_light": "#FFEDD5"
+    },
+    "status": {
+      "ready": "#10B981",
+      "ready_bg": "#D1FAE5",
+      "waiting": "#F59E0B",
+      "waiting_bg": "#FEF3C7",
+      "in_progress": "#3B82F6",
+      "in_progress_bg": "#DBEAFE",
+      "destructive": "#EF4444"
+    },
+    "ui": {
+      "border": "#E4E4E7",
+      "ring": "#F97316",
+      "skeleton": "#E4E4E7"
+    }
+  },
+  "typography_scales": {
+    "h1_marketing": "text-5xl md:text-6xl font-extrabold tracking-tighter leading-none text-zinc-950",
+    "h1_app": "text-3xl font-bold tracking-tight text-zinc-950",
+    "h2": "text-2xl font-bold tracking-tight text-zinc-900",
+    "h3": "text-xl font-semibold tracking-tight text-zinc-900",
+    "h4": "text-lg font-semibold text-zinc-900",
+    "body_large": "text-lg text-zinc-700 leading-relaxed",
+    "body_base": "text-base text-zinc-700 leading-normal",
+    "body_small": "text-sm text-zinc-500",
+    "kpi_value": "text-4xl font-bold tracking-tighter text-zinc-950",
+    "kpi_label": "text-xs font-semibold uppercase tracking-[0.1em] text-zinc-500",
+    "arabic_adjustments": "Add leading-loose or leading-relaxed for Arabic body text as Arabic script requires more vertical breathing room."
+  },
+  "layout_and_spacing": {
+    "general": "Adhere to the Tailwind spacing scale. Use generous padding (p-12, p-16, p-24) for the marketing pages. Use dense padding (p-4, p-6) for the B2B dashboard and kitchen display.",
+    "marketing_grid": "Mode A: 'Tetris' Grid. 12-column base, gap-8. Highly asymmetrical. Overlapping image elements over crisp, rigid typography blocks.",
+    "dashboard_grid": "Mode B: 'Control Room' Grid. 4-column base, gap-6. Every pixel utilized. KPI summary cards span 1 col, main charts span 2-3 cols.",
+    "kitchen_kanban": "Masonry or strict multi-column layout for tickets. Minimize gaps (gap-4) to fit maximum tickets on screen. Use h-full to stretch.",
+    "radius": "rounded-lg (8px) for buttons and inputs. rounded-xl (12px) for large cards and modals. Do not use overly pill-shaped elements; keep it slightly rigid.",
+    "shadows": "Minimal. Use shadow-sm for default cards, shadow-md for hovers. No aggressive colored glows."
+  },
+  "components": {
+    "cards": "Flat solid surfaces. 1px subtle border (border-zinc-200). Background white. No glassmorphism in the dashboard.",
+    "buttons": {
+      "primary": "bg-orange-500 text-white hover:bg-orange-600 rounded-lg font-semibold shadow-sm transition-colors",
+      "secondary": "bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 rounded-lg font-medium",
+      "kitchen_ready": "bg-emerald-500 text-white hover:bg-emerald-600 w-full font-bold h-12 text-lg uppercase tracking-wider"
+    },
+    "navigation": "Sidebar for Dashboard (w-64, hidden on mobile). Sticky glassmorphism header for marketing page (bg-white/80 backdrop-blur-xl border-b border-zinc-200).",
+    "inputs": "Shadcn standard. Focus state: ring-2 ring-orange-500 ring-offset-2. Error state: border-red-500."
+  },
+  "localization_and_currency": {
+    "languages": ["fr", "ar", "en"],
+    "default_language": "fr",
+    "rtl_support": "CRITICAL. The UI must support Arabic RTL. Use Tailwind logical properties (ps-4, pe-4, ms-4, me-4, text-start, text-end, border-s, border-e) instead of left/right specifics.",
+    "currency": "DZD (Dinar Algérien).",
+    "currency_format": "Number followed by ' DA' with space separator for thousands (e.g., 1 200 DA, 45 000 DA). Do NOT use decimal cents unless strictly required, as it's a cash economy.",
+    "payment_flow": "CASH ONLY. Do not include Stripe, credit card fields, or online payment toggles."
+  },
+  "screens": {
+    "marketing_landing": {
+      "sections": ["Hero", "Problem/Solution", "Features Grid", "Pricing Tiers", "Testimonials", "CTA"],
+      "details": "Hero headline in French, smaller kicker in Arabic. Pricing tiers strictly in DZD. High contrast, large photography, bold Harissa Orange CTAs."
+    },
+    "strategy_page": {
+      "details": "Long-form scrolling page outlining market validation, Algerian restaurant statistics, business model, and product roadmap. Use dense typography (Tajawal body_large) with generous left margins."
+    },
+    "auth": {
+      "details": "Simple center-aligned modal/page. Email + Password. JWT-ready structure."
+    },
+    "dashboard": {
+      "kpis": ["Chiffre d'affaires", "Commandes", "Ticket moyen", "Tables actives"],
+      "charts": "Recharts BarChart for hourly revenue. Table for latest live orders.",
+      "layout": "Sidebar on left (LTR) or right (RTL). Top header with Restaurant Name and Date."
+    },
+    "kitchen_display": {
+      "tabs": ["Tout", "En attente", "En cours", "Prêt"],
+      "details": "Auto-refreshing grid of order cards. Each card shows Table #, Elapsed Time (red if >15m), Items. Large 'Commencer' (blue) or 'Marquer prêt' (green) buttons."
+    },
+    "menu_maker": {
+      "details": "CRUD interface for categories and items. Forms MUST have tabs for trilingual input (AR, FR, EN) for Title and Description. Toggle for availability."
+    },
+    "qr_generator": {
+      "details": "Grid showing all tables. Button to 'Generate PDF' or print directly. The printed view must hide the sidebar and topnav, showing only a clean, branded QR card with instructions."
+    },
+    "public_menu": {
+      "details": "Mobile-first view at /m/:slug?table=X. Customer selects language first. Shows categories, items, prices in DZD. Add to cart. Floating action button for 'Commander' (Submit Order). No payment step, just submit to kitchen."
+    }
+  },
+  "media": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1648808694138-6706c5efc80a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBjYWZlJTIwaW50ZXJpb3J8ZW58MHx8fHwxNzc3MzM2NjYzfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Modern bright cafe interior with large windows, perfect for the landing page hero."
+    },
+    "kitchen_feature": {
+      "url": "https://images.pexels.com/photos/8629081/pexels-photo-8629081.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Chef skillfully cooking in a modern kitchen. Use in the 'Kitchen Display System' feature section."
+    },
+    "qr_feature": {
+      "url": "https://images.unsplash.com/photo-1706759755964-b0aa57a58c5a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTJ8MHwxfHNlYXJjaHwyfHxzY2FubmluZyUyMHFyJTIwY29kZSUyMHJlc3RhdXJhbnR8ZW58MHx8fHwxNzc3MzM2NjYzfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Person using a cell phone at a table, ideal for illustrating the 'Scan to Order' QR feature."
+    }
+  },
+  "testing": {
+    "requirements": "Every interactive element MUST include a role-based data-testid attribute in kebab-case.",
+    "examples": [
+      "data-testid='marketing-cta-button'",
+      "data-testid='login-email-input'",
+      "data-testid='kitchen-mark-ready-button'",
+      "data-testid='menu-add-item-button'",
+      "data-testid='customer-add-to-cart'"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "DO NOT output markdown code blocks in your file creation, just the exact code.",
+    "Use pure HTML/Tailwind for the marketing page layouts to ensure overlapping and bento grid asymmetry. Use Shadcn for interactive components (Forms, Dialogs, Tables).",
+    "Ensure global CSS imports Google Fonts (Outfit & Tajawal) and applies them correctly.",
+    "Build the dashboard using logical CSS properties for strict RTL support when the Arabic language is toggled.",
+    "Strictly format all currency as 'X XXX DA'. Do not use currency symbols like $, €, or £.",
+    "The customer-facing menu must skip payment integration completely. Orders flow directly to the Kitchen Display System.",
+    "Adhere strictly to the Swiss High-Contrast aesthetic: rely on white space, sharp 1px borders, and bold typography rather than shadows and gradients."
+  ]
+}
