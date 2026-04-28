@@ -59,3 +59,14 @@ Full SaaS for Algerian restaurants: Menu Maker (trilingual AR/FR/EN), QR per tab
 - Cookie-vs-bearer precedence in `get_current_user` currently prefers cookie — minor hardening item noted in test report; not blocking
 - Public order endpoint has no rate-limit → add captcha/IP throttle before production
 - `seed_demo` idempotency is based on admin user existence only
+
+## Iteration 2 (2026-04-28)
+- [x] Staff roles (owner/manager/kitchen/waiter) with RBAC on `/api/staff` + frontend RoleGuard
+- [x] CSV exports: `/api/export/orders.csv`, `/stock.csv`, `/items.csv` + download buttons on Orders, Stock, Menu pages
+- [x] Customer feedback flow: star-rating modal after order placed on `/m/:slug`, `/api/public/.../feedback` endpoint
+- [x] `/app/feedback` page for owners/managers with avg rating + distribution + list
+- [x] `/app/staff` page: add/edit/delete team members, role badges, modal form
+- [x] Offline indicator (online/offline banner) + service worker (stale-while-revalidate for GET /api + assets)
+- [x] 3 new seeded test accounts: manager, kitchen, waiter
+- [x] Role-based sidebar (hides routes per role) + RoleHome (role-based default landing)
+- [x] Backend tests: 50/50 passing
