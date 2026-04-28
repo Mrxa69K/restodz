@@ -80,3 +80,14 @@ Full SaaS for Algerian restaurants: Menu Maker (trilingual AR/FR/EN), QR per tab
 - [x] `DEPLOYMENT_NOTES.md` created with key-rotation reminders
 - [x] RBAC: only owner + manager can use OCR endpoints
 - [x] Backend tests: 59/59 passing (9 new OCR tests + 50 regression)
+
+## Iteration 4 (2026-04-28) — Kitchen Big Screen
+- [x] New route `/app/kitchen-display` (owner/manager/kitchen) — fullscreen zero-chrome 3-column Kanban
+- [x] Columns: En attente (amber) / En cours (blue) / Prêt (green) with live counts
+- [x] Color-coded urgency on cards: neutral 0-8 min · amber 8-15 · red + flame icon >15
+- [x] Auto-refresh 5s + Web Audio beep on new pending order (no external mp3)
+- [x] Big tap targets (h-16 buttons, text-2xl uppercase) — designed for wall-mounted tablet
+- [x] Toggles: sound on/off, dark/light theme, fullscreen API, exit (back to /app/kitchen)
+- [x] Live clock + overdue counter in header ("16 en retard")
+- [x] Preferences persisted in localStorage (dark/sound)
+- [x] Launch button "Mode grand écran" on regular /app/kitchen page

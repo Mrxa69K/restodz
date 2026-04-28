@@ -20,6 +20,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import StaffPage from "@/pages/StaffPage";
 import FeedbackPage from "@/pages/FeedbackPage";
 import CustomerMenu from "@/pages/CustomerMenu";
+import KitchenDisplay from "@/pages/KitchenDisplay";
 
 function Protected({ children }) {
   const auth = useAuth();
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/m/:slug" element={<CustomerMenu />} />
+            <Route path="/app/kitchen-display" element={<Protected><RoleGuard allow={["owner", "manager", "kitchen"]}><KitchenDisplay /></RoleGuard></Protected>} />
 
             <Route path="/app" element={<Protected><AppLayout /></Protected>}>
               <Route index element={<RoleHome />} />

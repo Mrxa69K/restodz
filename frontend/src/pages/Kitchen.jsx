@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock, AlertTriangle } from "lucide-react";
+import { Clock, AlertTriangle, Maximize } from "lucide-react";
+import { Link } from "react-router-dom";
 import api, { formatDZD, LOCALE_NAME } from "@/lib/api";
 import { useI18n } from "@/context/I18nContext";
 import { toast } from "sonner";
@@ -109,9 +110,14 @@ export default function Kitchen() {
           <h1 className="font-display font-black text-3xl tracking-tight">{t("kitchen")}</h1>
           <p className="text-rx-ink-2 mt-1">Commandes en cuisine · temps réel</p>
         </div>
-        <div className="text-xs text-rx-ink-2 bg-rx-muted px-3 py-1.5 rounded-full">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block me-2 pulse-dot" />
-          Auto-refresh 10s
+        <div className="flex items-center gap-2">
+          <Link to="/app/kitchen-display" className="inline-flex items-center gap-2 bg-zinc-950 hover:bg-zinc-800 text-white rounded-lg px-4 py-2 font-semibold transition-colors" data-testid="open-kd">
+            <Maximize className="w-4 h-4" /> Mode grand écran
+          </Link>
+          <div className="text-xs text-rx-ink-2 bg-rx-muted px-3 py-1.5 rounded-full hidden md:inline-flex">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 me-2 pulse-dot" />
+            Auto-refresh 10s
+          </div>
         </div>
       </div>
 
